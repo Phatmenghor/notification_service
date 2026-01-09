@@ -96,41 +96,72 @@ public class TelegramNotificationConsumer {
     }
 
     private void sendToTelegram(NotificationMessage message, NotificationLog notificationLog) {
-        try {
-            notificationLog.setStatus(NotificationStatus.PROCESSING);
-            logRepository.saveAndFlush(notificationLog);
+        int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // ✅ FIX: Fetch fresh entity from database to avoid stale state
+                NotificationLog freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.PROCESSING);
+                logRepository.saveAndFlush(freshLog);
 
-            String apiUrl = telegramApiUrl + message.getTelegramBotToken() + "/sendMessage";
+                String apiUrl = telegramApiUrl + message.getTelegramBotToken() + "/sendMessage";
 
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("chat_id", message.getRecipient());
-            requestBody.put("text", formatTelegramMessage(message));
-            requestBody.put("parse_mode", "HTML");
+                Map<String, Object> requestBody = new HashMap<>();
+                requestBody.put("chat_id", message.getRecipient());
+                requestBody.put("text", formatTelegramMessage(message));
+                requestBody.put("parse_mode", "HTML");
 
-            WebClient webClient = webClientBuilder.baseUrl(apiUrl).build();
-            
-            String response = webClient.post()
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(Duration.ofMillis(timeout))
-                .onErrorResume(e -> {
-                    log.error("Telegram API error: {}", e.getMessage());
-                    return Mono.just("ERROR: " + e.getMessage());
-                })
-                .block();
+                WebClient webClient = webClientBuilder.baseUrl(apiUrl).build();
+                
+                String response = webClient.post()
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofMillis(timeout))
+                    .onErrorResume(e -> {
+                        log.error("Telegram API error: {}", e.getMessage());
+                        return Mono.just("ERROR: " + e.getMessage());
+                    })
+                    .block();
 
-            notificationLog.setStatus(NotificationStatus.SENT);
-            notificationLog.setResponse(response);
-            notificationLog.setSentAt(LocalDateTime.now());
-            logRepository.saveAndFlush(notificationLog);
+                // ✅ FIX: Fetch fresh entity again before final update
+                freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.SENT);
+                freshLog.setResponse(response);
+                freshLog.setSentAt(LocalDateTime.now());
+                logRepository.saveAndFlush(freshLog);
 
-            log.info("Telegram message sent - Chat: {}, Batch: {}", 
-                     message.getRecipient(), message.getBatchId());
-
-        } catch (Exception e) {
-            log.error("Failed to send Telegram: {}", e.getMessage(), e);
-            updateLogAsFailed(notificationLog, e.getMessage());
+                log.info("Telegram message sent - Chat: {}, Batch: {}", 
+                         message.getRecipient(), message.getBatchId());
+                
+                return; // Success, exit method
+                
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+                log.warn("Optimistic locking conflict, attempt {}/{}: {}", 
+                         attempt + 1, maxRetries, e.getMessage());
+                
+                if (attempt == maxRetries - 1) {
+                    log.error("Failed to update notification log after {} retries", maxRetries);
+                    updateLogAsFailed(notificationLog, "Optimistic locking failure after retries");
+                }
+                
+                // Wait before retrying
+                try {
+                    Thread.sleep(100 * (attempt + 1)); // Exponential backoff
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                
+            } catch (Exception e) {
+                log.error("Failed to send Telegram: {}", e.getMessage(), e);
+                updateLogAsFailed(notificationLog, e.getMessage());
+                return; // Exit on other errors
+            }
         }
     }
 
@@ -149,13 +180,35 @@ public class TelegramNotificationConsumer {
     }
 
     private void updateLogAsFailed(NotificationLog notificationLog, String error) {
-        try {
-            notificationLog.setStatus(NotificationStatus.FAILED);
-            notificationLog.setErrorMessage(error);
-            notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
-            logRepository.saveAndFlush(notificationLog);
-        } catch (Exception e) {
-            log.error("Failed to update notification log: {}", e.getMessage());
+        int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // ✅ FIX: Always fetch fresh entity
+                NotificationLog freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.FAILED);
+                freshLog.setErrorMessage(error);
+                freshLog.setRetryCount(freshLog.getRetryCount() + 1);
+                logRepository.saveAndFlush(freshLog);
+                
+                return; // Success
+                
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+                log.warn("Failed to update log as failed, attempt {}/{}", attempt + 1, maxRetries);
+                
+                if (attempt < maxRetries - 1) {
+                    try {
+                        Thread.sleep(100 * (attempt + 1));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Critical error updating notification log: {}", e.getMessage());
+                return;
+            }
         }
     }
 }

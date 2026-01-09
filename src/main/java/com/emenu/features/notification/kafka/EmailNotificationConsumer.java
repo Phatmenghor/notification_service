@@ -88,42 +88,77 @@ public class EmailNotificationConsumer {
     }
 
     private void sendEmail(NotificationMessage message, NotificationLog notificationLog) {
-        try {
-            notificationLog.setStatus(NotificationStatus.PROCESSING);
-            logRepository.saveAndFlush(notificationLog);
+        int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // ✅ FIX: Fetch fresh entity from database to avoid stale state
+                NotificationLog freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.PROCESSING);
+                logRepository.saveAndFlush(freshLog);
 
-            JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-            mailSender.setHost(message.getEmailSmtpHost());
-            mailSender.setPort(message.getEmailSmtpPort());
-            mailSender.setUsername(message.getEmailSmtpUsername());
-            mailSender.setPassword(message.getEmailSmtpPassword());
+                JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+                mailSender.setHost(message.getEmailSmtpHost());
+                mailSender.setPort(message.getEmailSmtpPort());
+                mailSender.setUsername(message.getEmailSmtpUsername());
+                mailSender.setPassword(message.getEmailSmtpPassword());
 
-            Properties props = mailSender.getJavaMailProperties();
-            props.put("mail.transport.protocol", "smtp");
-            props.put("mail.smtp.auth", "true");
-            props.put("mail.smtp.starttls.enable", Boolean.TRUE.equals(message.getEmailUseTLS()) ? "true" : "false");
-            props.put("mail.smtp.ssl.enable", Boolean.TRUE.equals(message.getEmailUseSSL()) ? "true" : "false");
+                Properties props = mailSender.getJavaMailProperties();
+                props.put("mail.transport.protocol", "smtp");
+                props.put("mail.smtp.auth", "true");
+                props.put("mail.smtp.starttls.enable", Boolean.TRUE.equals(message.getEmailUseTLS()) ? "true" : "false");
+                props.put("mail.smtp.ssl.enable", Boolean.TRUE.equals(message.getEmailUseSSL()) ? "true" : "false");
 
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-            helper.setFrom(message.getEmailFrom());
-            helper.setTo(message.getRecipient());
-            helper.setSubject(message.getSubject() != null ? message.getSubject() : "Notification");
-            helper.setText(formatEmailMessage(message), true);
+                helper.setFrom(message.getEmailFrom());
+                helper.setTo(message.getRecipient());
+                helper.setSubject(message.getSubject() != null ? message.getSubject() : "Notification");
+                helper.setText(formatEmailMessage(message), true);
 
-            mailSender.send(mimeMessage);
+                mailSender.send(mimeMessage);
 
-            notificationLog.setStatus(NotificationStatus.SENT);
-            notificationLog.setResponse("Email sent successfully");
-            notificationLog.setSentAt(LocalDateTime.now());
-            logRepository.saveAndFlush(notificationLog);
+                // ✅ FIX: Fetch fresh entity again before final update
+                freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.SENT);
+                freshLog.setResponse("Email sent successfully");
+                freshLog.setSentAt(LocalDateTime.now());
+                logRepository.saveAndFlush(freshLog);
 
-            log.info("Email sent - To: {}, Batch: {}", message.getRecipient(), message.getBatchId());
-
-        } catch (MessagingException e) {
-            log.error("Failed to send email: {}", e.getMessage(), e);
-            updateLogAsFailed(notificationLog, e.getMessage());
+                log.info("Email sent - To: {}, Batch: {}", message.getRecipient(), message.getBatchId());
+                
+                return; // Success, exit method
+                
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+                log.warn("Optimistic locking conflict, attempt {}/{}: {}", 
+                         attempt + 1, maxRetries, e.getMessage());
+                
+                if (attempt == maxRetries - 1) {
+                    log.error("Failed to update notification log after {} retries", maxRetries);
+                    updateLogAsFailed(notificationLog, "Optimistic locking failure after retries");
+                }
+                
+                // Wait before retrying
+                try {
+                    Thread.sleep(100 * (attempt + 1)); // Exponential backoff
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                
+            } catch (MessagingException e) {
+                log.error("Failed to send email: {}", e.getMessage(), e);
+                updateLogAsFailed(notificationLog, e.getMessage());
+                return; // Exit on email errors
+            } catch (Exception e) {
+                log.error("Unexpected error sending email: {}", e.getMessage(), e);
+                updateLogAsFailed(notificationLog, e.getMessage());
+                return; // Exit on other errors
+            }
         }
     }
 
@@ -155,13 +190,35 @@ public class EmailNotificationConsumer {
     }
 
     private void updateLogAsFailed(NotificationLog notificationLog, String error) {
-        try {
-            notificationLog.setStatus(NotificationStatus.FAILED);
-            notificationLog.setErrorMessage(error);
-            notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
-            logRepository.saveAndFlush(notificationLog);
-        } catch (Exception e) {
-            log.error("Failed to update notification log: {}", e.getMessage());
+        int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // ✅ FIX: Always fetch fresh entity
+                NotificationLog freshLog = logRepository.findById(notificationLog.getId())
+                    .orElseThrow(() -> new RuntimeException("Log not found"));
+                
+                freshLog.setStatus(NotificationStatus.FAILED);
+                freshLog.setErrorMessage(error);
+                freshLog.setRetryCount(freshLog.getRetryCount() + 1);
+                logRepository.saveAndFlush(freshLog);
+                
+                return; // Success
+                
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+                log.warn("Failed to update log as failed, attempt {}/{}", attempt + 1, maxRetries);
+                
+                if (attempt < maxRetries - 1) {
+                    try {
+                        Thread.sleep(100 * (attempt + 1));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Critical error updating notification log: {}", e.getMessage());
+                return;
+            }
         }
     }
 }
