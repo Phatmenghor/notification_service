@@ -8,15 +8,7 @@ public enum RoleEnum {
     PLATFORM_OWNER("Platform Owner", "Full platform control", true, false, false),
     PLATFORM_ADMIN("Platform Admin", "Platform administration", true, false, false),
     PLATFORM_MANAGER("Platform Manager", "Platform operations", true, false, false),
-    PLATFORM_SUPPORT("Platform Support", "Customer support", true, false, false),
-    
-    // Business Roles
-    BUSINESS_OWNER("Business Owner", "Business management", false, true, false),
-    BUSINESS_MANAGER("Business Manager", "Business operations", false, true, false),
-    BUSINESS_STAFF("Business Staff", "Basic business access", false, true, false),
-    
-    // Customer Roles
-    CUSTOMER("Customer", "Customer access", false, false, true);
+    PLATFORM_SUPPORT("Platform Support", "Customer support", true, false, false);
 
     private final String displayName;
     private final String description;

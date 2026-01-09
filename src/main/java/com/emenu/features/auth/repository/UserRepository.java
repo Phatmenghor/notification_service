@@ -27,7 +27,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT DISTINCT u FROM User u " +
             "LEFT JOIN u.roles r " +
             "WHERE u.isDeleted = false " +
-            "AND (:businessId IS NULL OR u.businessId = :businessId) " +
             "AND (:userTypes IS NULL OR u.userType IN :userTypes) " +
             "AND (:accountStatuses IS NULL OR u.accountStatus IN :accountStatuses) " +
             "AND (:roles IS NULL OR r.name IN :roles) " +
@@ -37,38 +36,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             "    LOWER(u.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "    LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<User> searchUsers(
-            @Param("businessId") UUID businessId,
             @Param("userTypes") List<UserType> userTypes,
             @Param("accountStatuses") List<AccountStatus> accountStatuses,
             @Param("roles") List<RoleEnum> roles,
             @Param("search") String search,
             Pageable pageable
     );
-
-    @Query("SELECT COUNT(u) FROM User u WHERE u.businessId = :businessId AND u.isDeleted = false")
-    long countByBusinessId(@Param("businessId") UUID businessId);
-
-    // Find all users by business
-    @Query("SELECT u FROM User u WHERE u.businessId = :businessId AND u.isDeleted = false")
-    List<User> findAllByBusinessIdAndIsDeletedFalse(@Param("businessId") UUID businessId);
-
-    // Find users by role
-    @Query("SELECT DISTINCT u FROM User u " +
-            "LEFT JOIN u.roles r " +
-            "WHERE r.name = :role AND u.isDeleted = false")
-    List<User> findByRoleAndIsDeletedFalse(@Param("role") RoleEnum role);
-
-    // Find all platform users (all roles except CUSTOMER and BUSINESS roles)
-    @Query("SELECT u FROM User u WHERE u.userType = 'PLATFORM_USER' AND u.isDeleted = false")
-    List<User> findAllPlatformUsers();
-
-    // Find all active users (for ALL_USERS notifications)
-    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' AND u.isDeleted = false")
-    List<User> findAllActiveUsers();
-
-    /**
-     * Check if user exists by email
-     */
-    @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email AND u.isDeleted = false")
-    boolean existsByEmailAndIsDeletedFalse(@Param("email") String email);
 }

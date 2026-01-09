@@ -33,16 +33,6 @@ public class SecurityUtils {
                 .orElseThrow(() -> new ValidationException("User not found"));
     }
 
-    public String getCurrentUserIdentifier() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-
-        return authentication.getName();
-    }
-
     public void validateAccountStatus(User user) {
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
             throw new ValidationException("Account is suspended");
@@ -53,58 +43,4 @@ public class SecurityUtils {
         }
     }
 
-    public boolean isCurrentUser(String userIdentifier) {
-        String currentUserIdentifier = getCurrentUserIdentifier();
-        return currentUserIdentifier != null && currentUserIdentifier.equals(userIdentifier);
-    }
-
-    public Optional<User> getCurrentUserOptional() {
-        try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-            if (authentication == null ||
-                    !authentication.isAuthenticated() ||
-                    "anonymousUser".equals(authentication.getPrincipal())) {
-                log.debug("No authenticated user - public access");
-                return Optional.empty();
-            }
-
-            String userIdentifier = authentication.getName();
-            Optional<User> userOpt = userRepository.findByUserIdentifierAndIsDeletedFalse(userIdentifier);
-
-            if (userOpt.isEmpty()) {
-                log.warn("Authenticated user not found in database: {}", userIdentifier);
-                return Optional.empty();
-            }
-
-            User user = userOpt.get();
-
-            try {
-                validateAccountStatus(user);
-            } catch (Exception e) {
-                log.warn("User account validation failed: {} - {}", userIdentifier, e.getMessage());
-                return Optional.empty();
-            }
-
-            return Optional.of(user);
-
-        } catch (Exception e) {
-            log.debug("Error getting current user (public access mode): {}", e.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    public UUID getCurrentUserBusinessId() {
-        try {
-            User currentUser = getCurrentUser();
-            return currentUser.getBusinessId();
-        } catch (Exception e) {
-            log.debug("Error getting business ID: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    public UUID getCurrentUserId() {
-        return getCurrentUser().getId();
-    }
 }

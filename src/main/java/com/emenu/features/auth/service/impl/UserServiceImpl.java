@@ -9,17 +9,11 @@ import com.emenu.features.auth.dto.request.UserCreateRequest;
 import com.emenu.features.auth.dto.response.UserResponse;
 import com.emenu.features.auth.dto.update.UserUpdateRequest;
 import com.emenu.features.auth.mapper.UserMapper;
-import com.emenu.features.auth.models.Business;
 import com.emenu.features.auth.models.Role;
 import com.emenu.features.auth.models.User;
-import com.emenu.features.auth.repository.BusinessRepository;
 import com.emenu.features.auth.repository.RoleRepository;
 import com.emenu.features.auth.repository.UserRepository;
-import com.emenu.features.auth.service.BusinessService;
 import com.emenu.features.auth.service.UserService;
-import com.emenu.features.payment.service.PaymentService;
-import com.emenu.features.subscription.repository.SubscriptionPlanRepository;
-import com.emenu.features.subscription.service.SubscriptionService;
 import com.emenu.security.SecurityUtils;
 import com.emenu.shared.dto.PaginationResponse;
 import com.emenu.shared.pagination.PaginationUtils;
@@ -42,8 +36,6 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final BusinessRepository businessRepository;
-    private final BusinessService businessService;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final SecurityUtils securityUtils;
@@ -58,12 +50,6 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        if (request.getBusinessId() != null) {
-            Business business = businessRepository.findByIdAndIsDeletedFalse(request.getBusinessId())
-                    .orElseThrow(() -> new ValidationException("Business not found"));
-            user.setBusinessId(business.getId());
-        }
 
         List<Role> roles = roleRepository.findByNameIn(request.getRoles());
         if (roles.size() != request.getRoles().size()) {
@@ -80,10 +66,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public PaginationResponse<UserResponse> getAllUsers(UserFilterRequest request) {
-        User currentUser = securityUtils.getCurrentUser();
-        if (currentUser.isBusinessUser() && request.getBusinessId() == null) {
-            request.setBusinessId(currentUser.getBusinessId());
-        }
 
         Pageable pageable = PaginationUtils.createPageable(
                 request.getPageNo(), request.getPageSize(), request.getSortBy(), request.getSortDirection()
@@ -98,7 +80,6 @@ public class UserServiceImpl implements UserService {
                 ? request.getRoles() : null;
 
         Page<User> userPage = userRepository.searchUsers(
-                request.getBusinessId(),
                 userTypes,
                 accountStatuses,
                 roles,
@@ -124,11 +105,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndIsDeletedFalse(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (request.getBusinessId() != null && !request.getBusinessId().equals(user.getBusinessId())) {
-            Business business = businessRepository.findByIdAndIsDeletedFalse(request.getBusinessId())
-                    .orElseThrow(() -> new ValidationException("Business not found"));
-            user.setBusinessId(business.getId());
-        }
 
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             List<Role> roles = roleRepository.findByNameIn(request.getRoles());

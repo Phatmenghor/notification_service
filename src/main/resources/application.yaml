@@ -1,13 +1,16 @@
-# application.yml - Cambodia E-Menu Platform Configuration
+# application.yml - Notification service Configuration
 spring:
   application:
-    name: cambodia-emenu-platform
+    name: notification-service
   profiles:
     active: dev
 
+server:
+  port: 5000
+
   # Database Configuration
   datasource:
-    url: jdbc:postgresql://165.22.247.142:5432/e_menu_platform
+    url: jdbc:postgresql://165.22.247.142:5432/notification_service
     username: postgres
     password: Hour1819
     driver-class-name: org.postgresql.Driver
@@ -37,16 +40,11 @@ spring:
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=1h
 
-# Server Configuration
-server:
-  port: 8080
-  url: "http://165.22.247.142:8080"
-  address: 0.0.0.0  # IMPORTANT: Listen on all interfaces
 
 # JWT telegram
 jwt:
   secret: da2bd42bef8f9f957d647ed13571d35b59c7055fb723eacdb05154878da17d77d3180385fc232cab38bded0fc7dbda0d439cc275e91164ade266d64d50633bc7
-  expiration: 99999999999999999 # Extended for development
+  expiration: 99999999999999999
 
 # API Documentation
 springdoc:
@@ -80,28 +78,13 @@ telegram:
   bot:
     token: "8464259107:AAHdIC3EZb_3uID4vnhteY6PYtmO9WGDBjU"
     enabled: true
-    group-chat-id: "-1002784141362" # Group chat ID for all platform notifications
-    notifications:
-      # Platform-wide notifications (sent to group)
-      customer-registration: true
-      business-registration: true
-      telegram-linking: true
-      system-events: true
-
-      # Business-specific notifications (sent to business owners only)
-      order-notifications: true
-      subscription-alerts: true
-      payment-updates: true
-
-      # Personal notifications (sent to individual users)
-      welcome-messages: true
-      account-updates: true
+    group-chat-id: "-1002784141362"
 
 # Application Configuration
 app:
-  name: "Cambodia E-Menu Platform"
+  name: "Notification Service"
   version: "1.0.0"
-  description: "Restaurant Management Platform for Cambodia with Telegram Integration"
+  description: "Notification for alert push"
 
   # Data Initialization
   init:
@@ -109,60 +92,7 @@ app:
     admin-email: "phatmenghor19@gmail.com"
     admin-password: "88889999"
 
-  # CORS Configuration
-  cors:
-    allowed-origins: "http://localhost:3000,http://localhost:4200,http://localhost:5173,http://152.42.219.13:8080,https://152.42.219.13:8080,http://152.42.219.13,https://152.42.219.13"
-    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
-    allowed-headers: "*"
-    allow-credentials: true
-
   # Security Configuration
   security:
     token-cleanup:
       enabled: true
-
----
-# Development Profile
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${EMAIL_USERNAME:your-email@gmail.com}
-    password: ${EMAIL_PASSWORD:your-app-password}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: false
-
----
-# Production Profile
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  jpa:
-    hibernate:
-      ddl-auto: validate # Don't auto-update schema in production
-    show-sql: false
-
-# Logging Configuration
-logging:
-  level:
-    root: INFO
-    com.emenu: INFO
-    org.springframework: WARN
-    org.hibernate: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.type: WARN

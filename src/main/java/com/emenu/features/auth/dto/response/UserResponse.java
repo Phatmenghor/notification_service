@@ -27,6 +27,4 @@ public class UserResponse extends BaseAuditResponse {
     private String position;
     private String address;
     private String notes;
-    private UUID businessId;
-    private String businessName;
 }

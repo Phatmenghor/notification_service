@@ -1,8 +1,6 @@
 package com.emenu.features.auth.mapper;
 
 import com.emenu.enums.user.RoleEnum;
-import com.emenu.features.auth.dto.request.BusinessOwnerCreateRequest;
-import com.emenu.features.auth.dto.request.RegisterRequest;
 import com.emenu.features.auth.dto.request.UserCreateRequest;
 import com.emenu.features.auth.dto.response.LoginResponse;
 import com.emenu.features.auth.dto.response.UserResponse;
@@ -25,14 +23,12 @@ public abstract class UserMapper {
     protected PaginationMapper paginationMapper;
 
     @Mapping(target = "fullName", expression = "java(user.getFullName())")
-    @Mapping(target = "businessName", source = "business.name")
     @Mapping(target = "roles", source = "roles", qualifiedByName = "rolesToEnums")
     public abstract UserResponse toResponse(User user);
 
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "fullName", expression = "java(user.getFullName())")
     @Mapping(target = "roles", source = "user.roles", qualifiedByName = "rolesToStrings")
-    @Mapping(target = "businessName", source = "user.business.name")
     @Mapping(target = "accessToken", source = "token")
     @Mapping(target = "tokenType", constant = "Bearer")
     public abstract LoginResponse toLoginResponse(User user, String token);
@@ -40,8 +36,8 @@ public abstract class UserMapper {
     public abstract List<UserResponse> toResponseList(List<User> users);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "roles", ignore = true)  // ADD THIS LINE - Don't let MapStruct touch roles
-    @Mapping(target = "password", ignore = true)  // ADD THIS LINE - Don't let MapStruct touch password
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "password", ignore = true)
     public abstract void updateEntity(UserUpdateRequest request, @MappingTarget User user);
 
     public User toEntity(UserCreateRequest request) {
@@ -55,21 +51,6 @@ public abstract class UserMapper {
         user.setPosition(request.getPosition());
         user.setAddress(request.getAddress());
         user.setNotes(request.getNotes());
-        user.setUserType(request.getUserType());
-        user.setAccountStatus(request.getAccountStatus());
-        user.setBusinessId(request.getBusinessId());
-        return user;
-    }
-
-    public User toEntity(RegisterRequest request) {
-        User user = new User();
-        user.setUserIdentifier(request.getUserIdentifier());
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setProfileImageUrl(request.getProfileImageUrl());
-        user.setAddress(request.getAddress());
         user.setUserType(request.getUserType());
         user.setAccountStatus(request.getAccountStatus());
         return user;

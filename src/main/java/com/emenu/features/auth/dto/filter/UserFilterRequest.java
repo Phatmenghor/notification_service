@@ -13,8 +13,7 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class UserFilterRequest extends BaseFilterRequest {
-    private UUID businessId;
-    private List<AccountStatus> accountStatuses;  // Changed to List
-    private List<UserType> userTypes;             // Changed to List
+    private List<UserType> userTypes;
     private List<RoleEnum> roles;
+    private List<AccountStatus> accountStatuses;
 }

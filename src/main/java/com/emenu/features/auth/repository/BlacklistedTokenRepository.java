@@ -18,9 +18,6 @@ public interface BlacklistedTokenRepository extends JpaRepository<BlacklistedTok
     
     boolean existsByToken(String token);
 
-    @Query("SELECT COUNT(bt) > 0 FROM BlacklistedToken bt WHERE bt.userIdentifier = :userIdentifier")
-    boolean existsByUserIdentifier(@Param("userIdentifier") String userIdentifier);
-
     @Modifying
     @Query("DELETE FROM BlacklistedToken bt WHERE bt.expiryDate < :now")
     int deleteExpiredTokens(@Param("now") LocalDateTime now);

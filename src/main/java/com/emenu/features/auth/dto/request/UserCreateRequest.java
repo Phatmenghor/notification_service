@@ -35,8 +35,7 @@ public class UserCreateRequest {
     private UserType userType;
     
     private AccountStatus accountStatus = AccountStatus.ACTIVE;
-    private UUID businessId;
-    
+
     @NotNull(message = "At least one role is required")
     private List<RoleEnum> roles;
 }

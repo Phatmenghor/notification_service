@@ -14,7 +14,6 @@ public class UserUpdateRequest {
     private String phoneNumber;
     private String profileImageUrl;
     private AccountStatus accountStatus;
-    private UUID businessId;
     private List<RoleEnum> roles;
     private String position;
     private String address;

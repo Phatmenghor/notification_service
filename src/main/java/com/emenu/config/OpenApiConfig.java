@@ -24,7 +24,7 @@ public class OpenApiConfig {
     @Value("${app.description:Simple E-Menu Platform for Restaurant Management}")
     private String appDescription;
 
-    @Value("${server.url:http://localhost:8080}")
+    @Value("${server.url:http://localhost:5000}")
     private String serverUrl;
 
     @Bean

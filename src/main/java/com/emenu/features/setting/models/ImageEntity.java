@@ -13,11 +13,9 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "images", indexes = {
-        // ✅ FIXED: BaseUUIDEntity indexes
         @Index(name = "idx_image_entity_deleted", columnList = "is_deleted"),
         @Index(name = "idx_image_entity_deleted_created", columnList = "is_deleted, created_at"),
 
-        // ✅ FIXED: Image management indexes
         @Index(name = "idx_image_entity_type_deleted", columnList = "type, is_deleted"),
         @Index(name = "idx_image_entity_type_created_deleted", columnList = "type, created_at, is_deleted")
 })

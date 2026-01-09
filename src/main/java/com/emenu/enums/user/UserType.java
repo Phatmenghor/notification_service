@@ -4,9 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum UserType {
-    PLATFORM_USER("Platform User"),
-    BUSINESS_USER("Business User"), 
-    CUSTOMER("Customer");
+    PLATFORM_USER("Platform User");
 
     private final String description;
 

@@ -16,7 +16,6 @@ import java.util.UUID;
 @Table(name = "users", indexes = {
         @Index(name = "idx_user_deleted", columnList = "is_deleted"),
         @Index(name = "idx_user_identifier", columnList = "user_identifier, is_deleted"),
-        @Index(name = "idx_user_business", columnList = "business_id, is_deleted")
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -53,13 +52,6 @@ public class User extends BaseUUIDEntity {
     @Column(name = "account_status", nullable = false)
     private AccountStatus accountStatus = AccountStatus.ACTIVE;
 
-    @Column(name = "business_id")
-    private UUID businessId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "business_id", insertable = false, updatable = false)
-    private Business business;
-
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -86,21 +78,5 @@ public class User extends BaseUUIDEntity {
             return lastName;
         }
         return userIdentifier;
-    }
-
-    public boolean isActive() {
-        return AccountStatus.ACTIVE.equals(accountStatus);
-    }
-
-    public boolean isPlatformUser() {
-        return UserType.PLATFORM_USER.equals(userType);
-    }
-
-    public boolean isBusinessUser() {
-        return UserType.BUSINESS_USER.equals(userType);
-    }
-
-    public boolean isCustomer() {
-        return UserType.CUSTOMER.equals(userType);
     }
 }

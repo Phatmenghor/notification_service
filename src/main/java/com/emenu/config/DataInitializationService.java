@@ -7,7 +7,6 @@ import com.emenu.features.auth.models.Role;
 import com.emenu.features.auth.models.User;
 import com.emenu.features.auth.repository.RoleRepository;
 import com.emenu.features.auth.repository.UserRepository;
-import com.emenu.features.subscription.service.SubscriptionPlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,9 +30,7 @@ public class DataInitializationService {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final SubscriptionPlanService subscriptionPlanService;
 
-    // ✅ ENHANCED: More robust synchronization
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
     private static final Object initLock = new Object();
 
@@ -49,7 +46,6 @@ public class DataInitializationService {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void initializeData() {
-        // ✅ ENHANCED: Double-checked locking pattern for thread safety
         if (initialized.get()) {
             log.info("Data initialization already completed. Skipping...");
             return;
@@ -128,7 +124,6 @@ public class DataInitializationService {
         
         for (RoleEnum roleEnum : missingRoles) {
             try {
-                // ✅ ENHANCED: Check if role was created by another thread
                 if (roleRepository.existsByName(roleEnum)) {
                     log.debug("Role {} already exists (created by another process)", roleEnum.name());
                     continue;
@@ -161,9 +156,6 @@ public class DataInitializationService {
             
             int usersCreated = 0;
             usersCreated += createPlatformOwner();
-            usersCreated += createDemoBusinessOwner();
-            usersCreated += createDemoCustomer();
-            usersCreated += createTestAccounts();
             
             return usersCreated;
             
@@ -202,118 +194,6 @@ public class DataInitializationService {
         } catch (Exception e) {
             log.error("❌ Error creating platform owner: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to create platform owner", e);
-        }
-    }
-
-    private int createDemoBusinessOwner() {
-        try {
-            String businessUserIdentifier = "demo-business-owner";
-            if (!userRepository.existsByUserIdentifierAndIsDeletedFalse(businessUserIdentifier)) {
-                User businessOwner = new User();
-                businessOwner.setUserIdentifier(businessUserIdentifier);
-                businessOwner.setEmail("demo-business@emenu-platform.com");
-                businessOwner.setPassword(passwordEncoder.encode("88889999"));
-                businessOwner.setFirstName("Demo");
-                businessOwner.setLastName("Restaurant Owner");
-                businessOwner.setUserType(UserType.BUSINESS_USER);
-                businessOwner.setAccountStatus(AccountStatus.ACTIVE);
-                businessOwner.setPhoneNumber("+1234567890");
-                businessOwner.setPosition("Owner");
-                businessOwner.setAddress("123 Demo Street");
-
-                Role businessOwnerRole = roleRepository.findByName(RoleEnum.BUSINESS_OWNER)
-                        .orElseThrow(() -> new RuntimeException("Business owner role not found"));
-                businessOwner.setRoles(List.of(businessOwnerRole));
-
-                businessOwner = userRepository.save(businessOwner);
-                log.info("✅ Created demo business owner: {} with ID: {}", businessUserIdentifier, businessOwner.getId());
-                return 1;
-            } else {
-                log.info("ℹ️ Demo business owner already exists: {}", businessUserIdentifier);
-                return 0;
-            }
-        } catch (Exception e) {
-            log.error("❌ Error creating demo business owner: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to create demo business owner", e);
-        }
-    }
-
-    private int createDemoCustomer() {
-        try {
-            String customerUserIdentifier = "demo-customer";
-            if (!userRepository.existsByUserIdentifierAndIsDeletedFalse(customerUserIdentifier)) {
-                User customer = new User();
-                customer.setUserIdentifier(customerUserIdentifier);
-                customer.setEmail("demo-customer@emenu-platform.com");
-                customer.setPassword(passwordEncoder.encode("88889999"));
-                customer.setFirstName("Demo");
-                customer.setLastName("Customer");
-                customer.setUserType(UserType.CUSTOMER);
-                customer.setAccountStatus(AccountStatus.ACTIVE);
-                customer.setPhoneNumber("+1987654321");
-
-                Role customerRole = roleRepository.findByName(RoleEnum.CUSTOMER)
-                        .orElseThrow(() -> new RuntimeException("Customer role not found"));
-                customer.setRoles(List.of(customerRole));
-
-                customer = userRepository.save(customer);
-                log.info("✅ Created demo customer: {} with ID: {}", customerUserIdentifier, customer.getId());
-                return 1;
-            } else {
-                log.info("ℹ️ Demo customer already exists: {}", customerUserIdentifier);
-                return 0;
-            }
-        } catch (Exception e) {
-            log.error("❌ Error creating demo customer: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to create demo customer", e);
-        }
-    }
-
-    private int createTestAccounts() {
-        try {
-            log.info("🔄 Creating test accounts with different statuses...");
-
-            int created = 0;
-            created += createTestUser("inactive-user", "Test", "Inactive", AccountStatus.INACTIVE, RoleEnum.CUSTOMER);
-            created += createTestUser("locked-user", "Test", "Locked", AccountStatus.LOCKED, RoleEnum.CUSTOMER);
-            created += createTestUser("suspended-user", "Test", "Suspended", AccountStatus.SUSPENDED, RoleEnum.BUSINESS_OWNER);
-
-            return created;
-            
-        } catch (Exception e) {
-            log.error("❌ Error creating test accounts: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to create test accounts", e);
-        }
-    }
-
-    private int createTestUser(String userIdentifier, String firstName, String lastName,
-                              AccountStatus status, RoleEnum roleEnum) {
-        try {
-            if (!userRepository.existsByUserIdentifierAndIsDeletedFalse(userIdentifier)) {
-                User user = new User();
-                user.setUserIdentifier(userIdentifier);
-                user.setEmail(userIdentifier + "@emenu-platform.com");
-                user.setPassword(passwordEncoder.encode("88889999"));
-                user.setFirstName(firstName);
-                user.setLastName(lastName);
-                user.setUserType(roleEnum.isCustomerRole() ? UserType.CUSTOMER :
-                        roleEnum.isBusinessRole() ? UserType.BUSINESS_USER : UserType.PLATFORM_USER);
-                user.setAccountStatus(status);
-
-                Role role = roleRepository.findByName(roleEnum)
-                        .orElseThrow(() -> new RuntimeException("Role not found: " + roleEnum));
-                user.setRoles(List.of(role));
-
-                user = userRepository.save(user);
-                log.info("✅ Created test user: {} with status: {} and ID: {}", userIdentifier, status, user.getId());
-                return 1;
-            } else {
-                log.info("ℹ️ Test user already exists: {}", userIdentifier);
-                return 0;
-            }
-        } catch (Exception e) {
-            log.error("❌ Error creating test user {}: {}", userIdentifier, e.getMessage(), e);
-            throw new RuntimeException("Failed to create test user: " + userIdentifier, e);
         }
     }
 }
