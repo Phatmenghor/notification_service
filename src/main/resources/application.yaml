@@ -1,14 +1,23 @@
-# application.yml - Notification service Configuration
 spring:
   application:
     name: notification-service
   profiles:
     active: dev
 
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-gateway-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+      retries: 3
+
 server:
   port: 5000
 
-  # Database Configuration
   datasource:
     url: jdbc:postgresql://165.22.247.142:5432/notification_service
     username: postgres
@@ -17,82 +26,50 @@ server:
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
 
-  # JPA Configuration
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
-    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: false
-        jdbc:
-          batch_size: 50
 
-  # Cache Configuration
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=1000,expireAfterWrite=1h
-
-
-# JWT telegram
 jwt:
-  secret: da2bd42bef8f9f957d647ed13571d35b59c7055fb723eacdb05154878da17d77d3180385fc232cab38bded0fc7dbda0d439cc275e91164ade266d64d50633bc7
+  secret: da2bd42bef8f9f957d647ed13571dadd5b59c7055fb723eacdb05154878da17d77d3180385fc232cab38bded0fc7dbda0d439cc275e91164ade266d64d50633bc7
   expiration: 99999999999999999
 
-# API Documentation
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
+# Notification Gateway Configuration
+notification:
+  gateway:
     enabled: true
-  api-docs:
-    path: /v3/api-docs
-    enabled: true
+    max-recipients-per-request: 100
+  kafka:
+    topics:
+      telegram: telegram-notifications
+      email: email-notifications
+      logs: notification-logs
+  telegram:
+    api-url: https://api.telegram.org/bot
+    timeout: 5000
+  email:
+    timeout: 10000
 
-# Actuator Configuration
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: when-authorized
-
-# Cambodia-Specific Configuration
-cambodia:
-  timezone: "Asia/Phnom_Penh"
-  currency: "USD"
-  language: "km"
-  country: "KH"
-
-# ===== TELEGRAM CONFIGURATION (MINIMAL) =====
-telegram:
-  bot:
-    token: "8464259107:AAHdIC3EZb_3uID4vnhteY6PYtmO9WGDBjU"
-    enabled: true
-    group-chat-id: "-1002784141362"
-
-# Application Configuration
 app:
-  name: "Notification Service"
+  name: "Notification Gateway Service"
   version: "1.0.0"
-  description: "Notification for alert push"
-
-  # Data Initialization
   init:
     create-admin: true
     admin-email: "phatmenghor19@gmail.com"
     admin-password: "88889999"
 
-  # Security Configuration
-  security:
-    token-cleanup:
-      enabled: true
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
