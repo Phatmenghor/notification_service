@@ -1,10 +1,12 @@
 package com.emenu.features.notification.controller;
 
 import com.emenu.features.notification.dto.request.CreateApiKeyRequest;
+import com.emenu.features.notification.dto.request.UpdateApiKeyRequest;
 import com.emenu.features.notification.dto.response.ApiKeyResponse;
 import com.emenu.features.notification.dto.response.UsageStatsResponse;
 import com.emenu.features.notification.service.ApiKeyService;
 import com.emenu.shared.dto.ApiResponse;
+import com.emenu.shared.dto.PaginationResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -35,8 +36,10 @@ public class ApiKeyController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ApiKeyResponse>>> getAllApiKeys() {
-        List<ApiKeyResponse> response = apiKeyService.getAllApiKeys();
+    public ResponseEntity<ApiResponse<PaginationResponse<ApiKeyResponse>>> getAllApiKeys(
+            @RequestParam(defaultValue = "1") Integer pageNo,
+            @RequestParam(defaultValue = "15") Integer pageSize) {
+        PaginationResponse<ApiKeyResponse> response = apiKeyService.getAllApiKeys(pageNo, pageSize);
         return ResponseEntity.ok(ApiResponse.success("API keys retrieved", response));
     }
 
@@ -49,7 +52,7 @@ public class ApiKeyController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ApiKeyResponse>> updateApiKey(
             @PathVariable UUID id,
-            @Valid @RequestBody CreateApiKeyRequest request) {
+            @Valid @RequestBody UpdateApiKeyRequest request) {
         ApiKeyResponse response = apiKeyService.updateApiKey(id, request);
         return ResponseEntity.ok(ApiResponse.success("API key updated", response));
     }

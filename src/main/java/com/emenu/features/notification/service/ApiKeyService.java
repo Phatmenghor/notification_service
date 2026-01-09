@@ -1,22 +1,23 @@
 package com.emenu.features.notification.service;
 
 import com.emenu.features.notification.dto.request.CreateApiKeyRequest;
+import com.emenu.features.notification.dto.request.UpdateApiKeyRequest;
 import com.emenu.features.notification.dto.response.ApiKeyResponse;
 import com.emenu.features.notification.dto.response.UsageStatsResponse;
 import com.emenu.features.notification.models.ApiKey;
+import com.emenu.shared.dto.PaginationResponse;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface ApiKeyService {
     
     ApiKeyResponse createApiKey(CreateApiKeyRequest request);
     
-    List<ApiKeyResponse> getAllApiKeys();
+    PaginationResponse<ApiKeyResponse> getAllApiKeys(Integer pageNo, Integer pageSize);
     
     ApiKeyResponse getApiKeyById(UUID id);
     
-    ApiKeyResponse updateApiKey(UUID id, CreateApiKeyRequest request);
+    ApiKeyResponse updateApiKey(UUID id, UpdateApiKeyRequest request);
     
     void deleteApiKey(UUID id);
     

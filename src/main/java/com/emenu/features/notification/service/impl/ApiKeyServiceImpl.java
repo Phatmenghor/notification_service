@@ -1,6 +1,8 @@
 package com.emenu.features.notification.service.impl;
 
+import com.emenu.exception.custom.AlreadyExistsException;
 import com.emenu.exception.custom.NotFoundException;
+import com.emenu.exception.custom.UnauthorizedException;
 import com.emenu.exception.custom.ValidationException;
 import com.emenu.features.notification.dto.request.CreateApiKeyRequest;
 import com.emenu.features.notification.dto.request.UpdateApiKeyRequest;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -61,7 +64,9 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         apiKey.setApiKeyValue(apiKeyValue);
         apiKey.setIsActive(true);
         apiKey.setCurrentUsage(0);
-        apiKey.setUsageResetDate(LocalDate.now().withDayOfMonth(1).plusMonths(1));
+
+        // Set usage reset date to first day of next month
+        apiKey.setUsageResetDate(LocalDateTime.now().withDayOfMonth(1).plusMonths(1).withHour(0).withMinute(0).withSecond(0));
 
         ApiKey savedApiKey = apiKeyRepository.save(apiKey);
         log.info("API key created successfully for system: {}", request.getSystemName());
@@ -81,7 +86,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     @Transactional(readOnly = true)
     public ApiKeyResponse getApiKeyById(UUID id) {
         ApiKey apiKey = apiKeyRepository.findById(id)
-            .orElseThrow(() -> new NotFoundException("API key not found"));
+                .orElseThrow(() -> new NotFoundException("API key not found"));
         return apiKeyMapper.toResponse(apiKey);
     }
 
@@ -90,7 +95,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         log.info("Updating API key: {}", id);
 
         ApiKey apiKey = apiKeyRepository.findById(id)
-            .orElseThrow(() -> new NotFoundException("API key not found"));
+                .orElseThrow(() -> new NotFoundException("API key not found"));
 
         if (request.getSystemName() != null && !request.getSystemName().equals(apiKey.getSystemName())) {
             if (apiKeyRepository.existsBySystemNameAndIsDeletedFalse(request.getSystemName())) {
@@ -138,7 +143,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         log.info("Deleting API key: {}", id);
 
         ApiKey apiKey = apiKeyRepository.findById(id)
-            .orElseThrow(() -> new NotFoundException("API key not found"));
+                .orElseThrow(() -> new NotFoundException("API key not found"));
 
         apiKey.setIsDeleted(true);
         apiKeyRepository.save(apiKey);
@@ -149,9 +154,9 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     @Override
     public ApiKey validateApiKey(String apiKeyValue) {
         ApiKey apiKey = apiKeyRepository.findByApiKeyValueAndIsDeletedFalse(apiKeyValue)
-            .orElseThrow(() -> new UnauthorizedException("Invalid API key"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid API key"));
 
-        if (!apiKey.getIsActive()) {
+        if (!Boolean.TRUE.equals(apiKey.getIsActive())) {
             throw new UnauthorizedException("API key is inactive");
         }
 
@@ -170,31 +175,32 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     @Transactional(readOnly = true)
     public UsageStatsResponse getUsageStats(String apiKeyValue) {
         ApiKey apiKey = apiKeyRepository.findByApiKeyValueAndIsDeletedFalse(apiKeyValue)
-            .orElseThrow(() -> new NotFoundException("API key not found"));
+                .orElseThrow(() -> new NotFoundException("API key not found"));
 
         boolean isUnlimited = apiKey.getMonthlyLimit() == null;
-        int remainingQuota = isUnlimited ? 0 : apiKey.getMonthlyLimit() - apiKey.getCurrentUsage();
-        double usagePercentage = isUnlimited ? 0.0 : 
-            (apiKey.getCurrentUsage() * 100.0) / apiKey.getMonthlyLimit();
+        int currentUsage = apiKey.getCurrentUsage() != null ? apiKey.getCurrentUsage() : 0;
+        int remainingQuota = isUnlimited ? 0 : apiKey.getMonthlyLimit() - currentUsage;
+        double usagePercentage = isUnlimited ? 0.0 :
+                (currentUsage * 100.0) / apiKey.getMonthlyLimit();
 
         return UsageStatsResponse.builder()
-            .currentUsage(apiKey.getCurrentUsage())
-            .monthlyLimit(apiKey.getMonthlyLimit())
-            .remainingQuota(remainingQuota)
-            .usagePercentage(usagePercentage)
-            .isUnlimited(isUnlimited)
-            .isExpired(apiKey.isExpired())
-            .build();
+                .currentUsage(currentUsage)
+                .monthlyLimit(apiKey.getMonthlyLimit())
+                .remainingQuota(remainingQuota)
+                .usagePercentage(usagePercentage)
+                .isUnlimited(isUnlimited)
+                .isExpired(apiKey.isExpired())
+                .build();
     }
 
     @Override
     public void resetUsageForAllKeys() {
         log.info("Starting monthly usage reset for all API keys");
 
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
         apiKeyRepository.findAllByIsDeletedFalse().forEach(apiKey -> {
-            if (apiKey.getUsageResetDate() != null && 
-                !today.isBefore(apiKey.getUsageResetDate())) {
+            if (apiKey.getUsageResetDate() != null &&
+                    !now.isBefore(apiKey.getUsageResetDate())) {
                 apiKey.resetUsage();
                 apiKeyRepository.save(apiKey);
                 log.info("Usage reset for API key: {}", apiKey.getSystemName());

@@ -1,6 +1,8 @@
 package com.emenu.features.notification.repository;
 
 import com.emenu.features.notification.models.ApiKey;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,12 @@ import java.util.UUID;
 public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
     
     Optional<ApiKey> findByApiKeyValueAndIsActiveTrueAndIsDeletedFalse(String apiKeyValue);
+    
+    Optional<ApiKey> findByApiKeyValueAndIsDeletedFalse(String apiKeyValue);
+    
+    Page<ApiKey> findAllByIsDeletedFalse(Pageable pageable);
+    
+    List<ApiKey> findAllByIsDeletedFalse();
     
     boolean existsByApiKeyValueAndIsDeletedFalse(String apiKeyValue);
     
