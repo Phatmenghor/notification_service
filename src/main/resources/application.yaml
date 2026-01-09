@@ -4,20 +4,6 @@ spring:
   profiles:
     active: dev
 
-  # Kafka Configuration
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: notification-gateway-group
-      auto-offset-reset: earliest
-      enable-auto-commit: false
-    producer:
-      acks: all
-      retries: 3
-
-server:
-  port: 5000
-
   datasource:
     url: jdbc:postgresql://165.22.247.142:5432/notification_service
     username: postgres
@@ -34,6 +20,21 @@ server:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-gateway-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+      retries: 3
+
+server:
+  port: 5000
 
 jwt:
   secret: da2bd42bef8f9f957d647ed13571dadd5b59c7055fb723eacdb05154878da17d77d3180385fc232cab38bded0fc7dbda0d439cc275e91164ade266d64d50633bc7
