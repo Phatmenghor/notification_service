@@ -8,15 +8,13 @@ import lombok.EqualsAndHashCode;
 @Data
 public class SystemSettingsResponse extends BaseAuditResponse {
     
-    // Telegram
+    // ========== Telegram Sender Config ==========
     private Boolean telegramEnabled;
-    private String telegramChatId;
     private Boolean telegramConfigured;
     
-    // Email
+    // ========== Email Sender Config ==========
     private Boolean emailEnabled;
     private String emailFrom;
-    private String emailTo;
     private String emailSmtpHost;
     private Integer emailSmtpPort;
     private Boolean emailConfigured;

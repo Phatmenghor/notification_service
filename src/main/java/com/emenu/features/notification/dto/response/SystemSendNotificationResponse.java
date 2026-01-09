@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -15,11 +16,15 @@ import java.util.UUID;
 @AllArgsConstructor
 public class SystemSendNotificationResponse {
     
-    private UUID logId;
+    private String batchId;
+    
+    private List<UUID> logIds;
     
     private NotificationChannel channel;
     
     private NotificationStatus status;
+    
+    private Integer totalRecipients;
     
     private String message;
 }

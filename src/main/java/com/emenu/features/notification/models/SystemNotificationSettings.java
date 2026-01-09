@@ -20,25 +20,19 @@ public class SystemNotificationSettings extends BaseUUIDEntity {
     @Column(name = "setting_key", unique = true, nullable = false)
     private String settingKey = "DEFAULT";
 
-    // Telegram Settings
+    // ========== Telegram Settings (Sender Config Only) ==========
     @Column(name = "telegram_enabled")
     private Boolean telegramEnabled = false;
 
     @Column(name = "telegram_bot_token", length = 500)
     private String telegramBotToken;
 
-    @Column(name = "telegram_chat_id", length = 200)
-    private String telegramChatId;
-
-    // Email Settings
+    // ========== Email Settings (Sender Config Only) ==========
     @Column(name = "email_enabled")
     private Boolean emailEnabled = false;
 
     @Column(name = "email_from")
     private String emailFrom;
-
-    @Column(name = "email_to")
-    private String emailTo;
 
     @Column(name = "email_smtp_host")
     private String emailSmtpHost;

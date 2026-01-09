@@ -15,16 +15,12 @@ public interface SystemSettingsMapper {
     
     default boolean isTelegramConfigured(SystemNotificationSettings settings) {
         return settings.getTelegramBotToken() != null && 
-               !settings.getTelegramBotToken().isBlank() &&
-               settings.getTelegramChatId() != null &&
-               !settings.getTelegramChatId().isBlank();
+               !settings.getTelegramBotToken().isBlank();
     }
     
     default boolean isEmailConfigured(SystemNotificationSettings settings) {
         return settings.getEmailFrom() != null &&
                !settings.getEmailFrom().isBlank() &&
-               settings.getEmailTo() != null &&
-               !settings.getEmailTo().isBlank() &&
                settings.getEmailSmtpHost() != null &&
                !settings.getEmailSmtpHost().isBlank() &&
                settings.getEmailSmtpPort() != null;

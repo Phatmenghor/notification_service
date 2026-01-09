@@ -23,12 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class SystemNotificationServiceImpl implements SystemNotificationService {
 
     private final SystemNotificationSettingsRepository settingsRepository;
@@ -48,6 +49,7 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
     }
 
     @Override
+    @Transactional
     public SystemSettingsResponse updateSystemSettings(UpdateSystemSettingsRequest request) {
         log.info("Updating system notification settings");
 
@@ -60,9 +62,6 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
         if (request.getTelegramBotToken() != null) {
             settings.setTelegramBotToken(request.getTelegramBotToken());
         }
-        if (request.getTelegramChatId() != null) {
-            settings.setTelegramChatId(request.getTelegramChatId());
-        }
 
         // Update Email settings
         if (request.getEmailEnabled() != null) {
@@ -70,9 +69,6 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
         }
         if (request.getEmailFrom() != null) {
             settings.setEmailFrom(request.getEmailFrom());
-        }
-        if (request.getEmailTo() != null) {
-            settings.setEmailTo(request.getEmailTo());
         }
         if (request.getEmailSmtpHost() != null) {
             settings.setEmailSmtpHost(request.getEmailSmtpHost());
@@ -100,6 +96,7 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
     }
 
     @Override
+    @Transactional
     public SystemSendNotificationResponse sendSystemNotification(String apiKeyValue, SystemSendNotificationRequest request) {
         log.info("Sending system notification - Channel: {}, Type: {}", request.getChannel(), request.getType());
 
@@ -112,31 +109,48 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
         // Validate channel is enabled and configured
         validateChannelSettings(settings, request.getChannel());
 
-        // Create notification log
-        NotificationLog notificationLog = createSystemNotificationLog(apiKey, settings, request);
-        NotificationLog savedLog = logRepository.save(notificationLog);
+        // Validate recipients
+        List<String> recipients = validateAndGetRecipients(request);
 
-        // Build message for Kafka
-        NotificationMessage message = buildSystemNotificationMessage(savedLog, settings, request);
-
-        // Send to Kafka
-        if (request.getChannel() == NotificationChannel.TELEGRAM) {
-            notificationProducer.sendTelegramNotification(message);
-        } else if (request.getChannel() == NotificationChannel.EMAIL) {
-            notificationProducer.sendEmailNotification(message);
+        if (recipients.isEmpty()) {
+            throw new ValidationException("At least one recipient is required");
         }
 
-        // Increment API Key usage
-        apiKey.incrementUsage();
+        // Generate batch ID
+        String batchId = UUID.randomUUID().toString();
+        List<UUID> logIds = new ArrayList<>();
+
+        // Create logs and send to Kafka for each recipient
+        for (String recipient : recipients) {
+            NotificationLog notificationLog = createSystemNotificationLog(apiKey, request, recipient, batchId);
+            NotificationLog savedLog = logRepository.save(notificationLog);
+            logIds.add(savedLog.getId());
+
+            // Build message for Kafka
+            NotificationMessage message = buildSystemNotificationMessage(savedLog, settings, request, recipient);
+
+            // Send to Kafka
+            if (request.getChannel() == NotificationChannel.TELEGRAM) {
+                notificationProducer.sendTelegramNotification(message);
+            } else if (request.getChannel() == NotificationChannel.EMAIL) {
+                notificationProducer.sendEmailNotification(message);
+            }
+
+            // Increment API Key usage
+            apiKey.incrementUsage();
+        }
+
         apiKeyRepository.save(apiKey);
 
-        log.info("System notification queued - Log ID: {}", savedLog.getId());
+        log.info("System notification batch queued - Batch: {}, Recipients: {}", batchId, recipients.size());
 
         return SystemSendNotificationResponse.builder()
-            .logId(savedLog.getId())
+            .batchId(batchId)
+            .logIds(logIds)
             .channel(request.getChannel())
             .status(NotificationStatus.PENDING)
-            .message("Notification queued successfully")
+            .totalRecipients(recipients.size())
+            .message("Notifications queued successfully")
             .build();
     }
 
@@ -157,45 +171,54 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
             if (settings.getTelegramBotToken() == null || settings.getTelegramBotToken().isBlank()) {
                 throw new ValidationException("Telegram bot token is not configured");
             }
-            if (settings.getTelegramChatId() == null || settings.getTelegramChatId().isBlank()) {
-                throw new ValidationException("Telegram chat ID is not configured");
-            }
         } else if (channel == NotificationChannel.EMAIL) {
             if (!Boolean.TRUE.equals(settings.getEmailEnabled())) {
                 throw new ValidationException("Email notifications are disabled in system settings");
             }
-            if (settings.getEmailFrom() == null || settings.getEmailTo() == null ||
-                settings.getEmailSmtpHost() == null || settings.getEmailSmtpPort() == null) {
+            if (settings.getEmailFrom() == null || settings.getEmailSmtpHost() == null ||
+                settings.getEmailSmtpPort() == null) {
                 throw new ValidationException("Email is not fully configured");
             }
         }
     }
 
+    private List<String> validateAndGetRecipients(SystemSendNotificationRequest request) {
+        if (request.getChannel() == NotificationChannel.TELEGRAM) {
+            if (request.getTelegramChatIds() == null || request.getTelegramChatIds().isEmpty()) {
+                throw new ValidationException("At least one Telegram chat ID is required");
+            }
+            return request.getTelegramChatIds();
+        } else if (request.getChannel() == NotificationChannel.EMAIL) {
+            if (request.getEmailRecipients() == null || request.getEmailRecipients().isEmpty()) {
+                throw new ValidationException("At least one email recipient is required");
+            }
+            return request.getEmailRecipients();
+        }
+        
+        throw new ValidationException("Unsupported notification channel");
+    }
+
     private NotificationLog createSystemNotificationLog(
-            ApiKey apiKey, SystemNotificationSettings settings, SystemSendNotificationRequest request) {
+            ApiKey apiKey, SystemSendNotificationRequest request, String recipient, String batchId) {
 
         NotificationLog notificationLog = new NotificationLog();
-        notificationLog.setBatchId(UUID.randomUUID().toString());
+        notificationLog.setBatchId(batchId);
         notificationLog.setApiKeyValue(apiKey.getApiKeyValue());
         notificationLog.setSystemName(apiKey.getSystemName());
         notificationLog.setChannel(request.getChannel());
         notificationLog.setType(request.getType());
         notificationLog.setStatus(NotificationStatus.PENDING);
+        notificationLog.setRecipient(recipient);
         notificationLog.setSubject(request.getSubject());
         notificationLog.setMessage(request.getMessage());
         notificationLog.setRetryCount(0);
-
-        if (request.getChannel() == NotificationChannel.TELEGRAM) {
-            notificationLog.setRecipient(settings.getTelegramChatId());
-        } else if (request.getChannel() == NotificationChannel.EMAIL) {
-            notificationLog.setRecipient(settings.getEmailTo());
-        }
 
         return notificationLog;
     }
 
     private NotificationMessage buildSystemNotificationMessage(
-            NotificationLog notificationLog, SystemNotificationSettings settings, SystemSendNotificationRequest request) {
+            NotificationLog notificationLog, SystemNotificationSettings settings, 
+            SystemSendNotificationRequest request, String recipient) {
 
         NotificationMessage.NotificationMessageBuilder builder = NotificationMessage.builder()
             .logId(notificationLog.getId())
@@ -204,7 +227,7 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
             .systemName(notificationLog.getSystemName())
             .channel(request.getChannel())
             .type(request.getType())
-            .recipient(notificationLog.getRecipient())
+            .recipient(recipient)
             .subject(request.getSubject())
             .message(request.getMessage())
             .retryCount(0);

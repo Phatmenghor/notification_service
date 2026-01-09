@@ -44,8 +44,17 @@ public class EmailNotificationConsumer {
             log.info("Processing Email notification - Partition: {}, Offset: {}", partition, offset);
             
             NotificationMessage message = objectMapper.readValue(payload, NotificationMessage.class);
-            sendEmail(message);
             
+            // Add retry mechanism with exponential backoff for finding the log
+            NotificationLog notificationLog = findNotificationLogWithRetry(message.getLogId(), 5, 200);
+            
+            if (notificationLog == null) {
+                log.error("Failed to find notification log after retries: {}", message.getLogId());
+                acknowledgment.acknowledge();
+                return;
+            }
+            
+            sendEmail(message, notificationLog);
             acknowledgment.acknowledge();
             
         } catch (Exception e) {
@@ -54,13 +63,34 @@ public class EmailNotificationConsumer {
         }
     }
 
-    private void sendEmail(NotificationMessage message) {
-        try {
-            NotificationLog notificationLog = logRepository.findById(message.getLogId())
-                .orElseThrow(() -> new RuntimeException("Notification log not found"));
+    private NotificationLog findNotificationLogWithRetry(java.util.UUID logId, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                var optionalLog = logRepository.findById(logId);
+                if (optionalLog.isPresent()) {
+                    return optionalLog.get();
+                }
+                
+                if (i < maxRetries - 1) {
+                    log.debug("Log not found yet, attempt {}/{}, waiting {}ms", i + 1, maxRetries, delayMs);
+                    Thread.sleep(delayMs);
+                    delayMs *= 2; // Exponential backoff
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Thread interrupted while waiting for log");
+                return null;
+            } catch (Exception e) {
+                log.error("Error finding notification log: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
 
+    private void sendEmail(NotificationMessage message, NotificationLog notificationLog) {
+        try {
             notificationLog.setStatus(NotificationStatus.PROCESSING);
-            logRepository.save(notificationLog);
+            logRepository.saveAndFlush(notificationLog);
 
             JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
             mailSender.setHost(message.getEmailSmtpHost());
@@ -87,13 +117,13 @@ public class EmailNotificationConsumer {
             notificationLog.setStatus(NotificationStatus.SENT);
             notificationLog.setResponse("Email sent successfully");
             notificationLog.setSentAt(LocalDateTime.now());
-            logRepository.save(notificationLog);
+            logRepository.saveAndFlush(notificationLog);
 
             log.info("Email sent - To: {}, Batch: {}", message.getRecipient(), message.getBatchId());
 
         } catch (MessagingException e) {
             log.error("Failed to send email: {}", e.getMessage(), e);
-            updateLogAsFailed(message.getLogId(), e.getMessage());
+            updateLogAsFailed(notificationLog, e.getMessage());
         }
     }
 
@@ -124,15 +154,12 @@ public class EmailNotificationConsumer {
         );
     }
 
-    private void updateLogAsFailed(java.util.UUID logId, String error) {
+    private void updateLogAsFailed(NotificationLog notificationLog, String error) {
         try {
-            NotificationLog notificationLog = logRepository.findById(logId).orElse(null);
-            if (notificationLog != null) {
-                notificationLog.setStatus(NotificationStatus.FAILED);
-                notificationLog.setErrorMessage(error);
-                notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
-                logRepository.save(notificationLog);
-            }
+            notificationLog.setStatus(NotificationStatus.FAILED);
+            notificationLog.setErrorMessage(error);
+            notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
+            logRepository.saveAndFlush(notificationLog);
         } catch (Exception e) {
             log.error("Failed to update notification log: {}", e.getMessage());
         }

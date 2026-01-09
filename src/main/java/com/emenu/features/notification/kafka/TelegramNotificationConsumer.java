@@ -52,8 +52,17 @@ public class TelegramNotificationConsumer {
             log.info("Processing Telegram notification - Partition: {}, Offset: {}", partition, offset);
             
             NotificationMessage message = objectMapper.readValue(payload, NotificationMessage.class);
-            sendToTelegram(message);
             
+            // Add retry mechanism with exponential backoff for finding the log
+            NotificationLog notificationLog = findNotificationLogWithRetry(message.getLogId(), 5, 200);
+            
+            if (notificationLog == null) {
+                log.error("Failed to find notification log after retries: {}", message.getLogId());
+                acknowledgment.acknowledge();
+                return;
+            }
+            
+            sendToTelegram(message, notificationLog);
             acknowledgment.acknowledge();
             
         } catch (Exception e) {
@@ -62,13 +71,34 @@ public class TelegramNotificationConsumer {
         }
     }
 
-    private void sendToTelegram(NotificationMessage message) {
-        try {
-            NotificationLog notificationLog = logRepository.findById(message.getLogId())
-                .orElseThrow(() -> new RuntimeException("Notification log not found"));
+    private NotificationLog findNotificationLogWithRetry(java.util.UUID logId, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                var optionalLog = logRepository.findById(logId);
+                if (optionalLog.isPresent()) {
+                    return optionalLog.get();
+                }
+                
+                if (i < maxRetries - 1) {
+                    log.debug("Log not found yet, attempt {}/{}, waiting {}ms", i + 1, maxRetries, delayMs);
+                    Thread.sleep(delayMs);
+                    delayMs *= 2; // Exponential backoff
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Thread interrupted while waiting for log");
+                return null;
+            } catch (Exception e) {
+                log.error("Error finding notification log: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
 
+    private void sendToTelegram(NotificationMessage message, NotificationLog notificationLog) {
+        try {
             notificationLog.setStatus(NotificationStatus.PROCESSING);
-            logRepository.save(notificationLog);
+            logRepository.saveAndFlush(notificationLog);
 
             String apiUrl = telegramApiUrl + message.getTelegramBotToken() + "/sendMessage";
 
@@ -93,14 +123,14 @@ public class TelegramNotificationConsumer {
             notificationLog.setStatus(NotificationStatus.SENT);
             notificationLog.setResponse(response);
             notificationLog.setSentAt(LocalDateTime.now());
-            logRepository.save(notificationLog);
+            logRepository.saveAndFlush(notificationLog);
 
             log.info("Telegram message sent - Chat: {}, Batch: {}", 
                      message.getRecipient(), message.getBatchId());
 
         } catch (Exception e) {
             log.error("Failed to send Telegram: {}", e.getMessage(), e);
-            updateLogAsFailed(message.getLogId(), e.getMessage());
+            updateLogAsFailed(notificationLog, e.getMessage());
         }
     }
 
@@ -118,15 +148,12 @@ public class TelegramNotificationConsumer {
         return formatted.toString();
     }
 
-    private void updateLogAsFailed(java.util.UUID logId, String error) {
+    private void updateLogAsFailed(NotificationLog notificationLog, String error) {
         try {
-            NotificationLog notificationLog = logRepository.findById(logId).orElse(null);
-            if (notificationLog != null) {
-                notificationLog.setStatus(NotificationStatus.FAILED);
-                notificationLog.setErrorMessage(error);
-                notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
-                logRepository.save(notificationLog);
-            }
+            notificationLog.setStatus(NotificationStatus.FAILED);
+            notificationLog.setErrorMessage(error);
+            notificationLog.setRetryCount(notificationLog.getRetryCount() + 1);
+            logRepository.saveAndFlush(notificationLog);
         } catch (Exception e) {
             log.error("Failed to update notification log: {}", e.getMessage());
         }

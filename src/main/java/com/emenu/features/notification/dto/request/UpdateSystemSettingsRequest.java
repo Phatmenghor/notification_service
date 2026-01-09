@@ -6,19 +6,15 @@ import lombok.Data;
 @Data
 public class UpdateSystemSettingsRequest {
     
-    // Telegram Settings
+    // ========== Telegram Sender Settings ==========
     private Boolean telegramEnabled;
     private String telegramBotToken;
-    private String telegramChatId;
     
-    // Email Settings
+    // ========== Email Sender Settings ==========
     private Boolean emailEnabled;
     
     @Email(message = "Invalid email format")
     private String emailFrom;
-    
-    @Email(message = "Invalid email format")
-    private String emailTo;
     
     private String emailSmtpHost;
     private Integer emailSmtpPort;
