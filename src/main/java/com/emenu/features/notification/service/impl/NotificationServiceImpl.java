@@ -75,6 +75,8 @@ public class NotificationServiceImpl implements NotificationService {
                 savedLog, apiKey, request, recipient, batchId
             );
 
+            log.info("Hi Hourng kak");
+
             // Send to appropriate Kafka topic
             if (request.getChannel() == NotificationChannel.TELEGRAM) {
                 notificationProducer.sendTelegramNotification(message);
