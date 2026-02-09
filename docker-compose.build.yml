@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  backend:
+    container_name: noticiation_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Cache Maven dependencies across builds
+    volumes:
+      - maven_repo:/root/.m2
+
+    restart: always
+
+    ports:
+      - "6060:8080"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  maven_repo:
