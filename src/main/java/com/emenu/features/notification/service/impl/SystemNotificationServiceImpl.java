@@ -233,7 +233,8 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
             .retryCount(0);
 
         if (request.getChannel() == NotificationChannel.TELEGRAM) {
-            builder.telegramBotToken(settings.getTelegramBotToken());
+            builder.telegramBotToken(settings.getTelegramBotToken())
+                   .telegramHtmlBody(request.getTelegramHtmlBody());
         } else if (request.getChannel() == NotificationChannel.EMAIL) {
             builder.emailFrom(settings.getEmailFrom())
                    .emailSmtpHost(settings.getEmailSmtpHost())
@@ -241,7 +242,8 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
                    .emailSmtpUsername(settings.getEmailSmtpUsername())
                    .emailSmtpPassword(settings.getEmailSmtpPassword())
                    .emailUseSSL(settings.getEmailUseSSL())
-                   .emailUseTLS(settings.getEmailUseTLS());
+                   .emailUseTLS(settings.getEmailUseTLS())
+                   .emailHtmlBody(request.getEmailHtmlBody());
         }
 
         return builder.build();

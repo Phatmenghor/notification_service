@@ -75,8 +75,6 @@ public class NotificationServiceImpl implements NotificationService {
                 savedLog, apiKey, request, recipient, batchId
             );
 
-            log.info("Hi Hourng kak");
-
             // Send to appropriate Kafka topic
             if (request.getChannel() == NotificationChannel.TELEGRAM) {
                 notificationProducer.sendTelegramNotification(message);
@@ -190,7 +188,8 @@ public class NotificationServiceImpl implements NotificationService {
             .retryCount(0);
 
         if (request.getChannel() == NotificationChannel.TELEGRAM) {
-            builder.telegramBotToken(request.getTelegram().getBotToken());
+            builder.telegramBotToken(request.getTelegram().getBotToken())
+                   .telegramHtmlBody(request.getTelegram().getHtmlBody());
         } else if (request.getChannel() == NotificationChannel.EMAIL) {
             builder.emailFrom(request.getEmail().getFrom())
                    .emailSmtpHost(request.getEmail().getSmtpHost())
@@ -198,7 +197,8 @@ public class NotificationServiceImpl implements NotificationService {
                    .emailSmtpUsername(request.getEmail().getSmtpUsername())
                    .emailSmtpPassword(request.getEmail().getSmtpPassword())
                    .emailUseSSL(request.getEmail().getUseSSL())
-                   .emailUseTLS(request.getEmail().getUseTLS());
+                   .emailUseTLS(request.getEmail().getUseTLS())
+                   .emailHtmlBody(request.getEmail().getHtmlBody());
         }
 
         return builder.build();

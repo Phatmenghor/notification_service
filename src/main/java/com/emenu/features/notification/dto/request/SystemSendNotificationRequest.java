@@ -30,4 +30,14 @@ public class SystemSendNotificationRequest {
     
     // For Email: List of email addresses
     private List<String> emailRecipients;
+
+    // ========== Custom Template Bodies (Optional) ==========
+
+    // Custom HTML body for email - replaces default template entirely
+    // Allows full HTML design like any email builder
+    private String emailHtmlBody;
+
+    // Custom formatted body for Telegram - replaces default template entirely
+    // Supports full Telegram HTML: <b>, <i>, <u>, <s>, <code>, <pre>, <a href="">, <tg-spoiler>, etc.
+    private String telegramHtmlBody;
 }

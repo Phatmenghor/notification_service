@@ -61,7 +61,15 @@ public class TelegramNotificationConsumer {
                 acknowledgment.acknowledge();
                 return;
             }
-            
+
+            // Idempotency check: skip if already sent to prevent duplicate notifications
+            if (notificationLog.getStatus() == NotificationStatus.SENT) {
+                log.warn("Telegram notification already SENT, skipping duplicate - LogId: {}, Batch: {}",
+                         message.getLogId(), message.getBatchId());
+                acknowledgment.acknowledge();
+                return;
+            }
+
             sendToTelegram(message, notificationLog);
             acknowledgment.acknowledge();
             
@@ -100,18 +108,32 @@ public class TelegramNotificationConsumer {
         
         for (int attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                // ✅ FIX: Fetch fresh entity from database to avoid stale state
+                // Fetch fresh entity from database to avoid stale state
                 NotificationLog freshLog = logRepository.findById(notificationLog.getId())
                     .orElseThrow(() -> new RuntimeException("Log not found"));
-                
+
+                // Idempotency: if already SENT by another consumer/retry, stop immediately
+                if (freshLog.getStatus() == NotificationStatus.SENT) {
+                    log.warn("Telegram already SENT (detected in retry loop), skipping - LogId: {}", freshLog.getId());
+                    return;
+                }
+
                 freshLog.setStatus(NotificationStatus.PROCESSING);
                 logRepository.saveAndFlush(freshLog);
 
                 String apiUrl = telegramApiUrl + message.getTelegramBotToken() + "/sendMessage";
 
+                // Use custom HTML body if provided, otherwise use default template
+                String telegramText;
+                if (message.getTelegramHtmlBody() != null && !message.getTelegramHtmlBody().isBlank()) {
+                    telegramText = message.getTelegramHtmlBody();
+                } else {
+                    telegramText = formatTelegramMessage(message);
+                }
+
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("chat_id", message.getRecipient());
-                requestBody.put("text", formatTelegramMessage(message));
+                requestBody.put("text", telegramText);
                 requestBody.put("parse_mode", "HTML");
 
                 WebClient webClient = webClientBuilder.baseUrl(apiUrl).build();
@@ -127,7 +149,7 @@ public class TelegramNotificationConsumer {
                     })
                     .block();
 
-                // ✅ FIX: Fetch fresh entity again before final update
+                // Fetch fresh entity again before final update
                 freshLog = logRepository.findById(notificationLog.getId())
                     .orElseThrow(() -> new RuntimeException("Log not found"));
                 
@@ -142,21 +164,32 @@ public class TelegramNotificationConsumer {
                 return; // Success, exit method
                 
             } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
-                log.warn("Optimistic locking conflict, attempt {}/{}: {}", 
+                log.warn("Optimistic locking conflict, attempt {}/{}: {}",
                          attempt + 1, maxRetries, e.getMessage());
-                
+
+                // Check if another thread already sent it
+                try {
+                    NotificationLog checkLog = logRepository.findById(notificationLog.getId()).orElse(null);
+                    if (checkLog != null && checkLog.getStatus() == NotificationStatus.SENT) {
+                        log.info("Telegram already sent by another thread, skipping - LogId: {}", notificationLog.getId());
+                        return;
+                    }
+                } catch (Exception ignored) {
+                    // Continue with retry
+                }
+
                 if (attempt == maxRetries - 1) {
                     log.error("Failed to update notification log after {} retries", maxRetries);
                     updateLogAsFailed(notificationLog, "Optimistic locking failure after retries");
                 }
-                
+
                 // Wait before retrying
                 try {
-                    Thread.sleep(100 * (attempt + 1)); // Exponential backoff
+                    Thread.sleep(100 * (attempt + 1));
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                 }
-                
+
             } catch (Exception e) {
                 log.error("Failed to send Telegram: {}", e.getMessage(), e);
                 updateLogAsFailed(notificationLog, e.getMessage());
@@ -184,10 +217,16 @@ public class TelegramNotificationConsumer {
         
         for (int attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                // ✅ FIX: Always fetch fresh entity
+                // Always fetch fresh entity
                 NotificationLog freshLog = logRepository.findById(notificationLog.getId())
                     .orElseThrow(() -> new RuntimeException("Log not found"));
-                
+
+                // Don't overwrite SENT status with FAILED
+                if (freshLog.getStatus() == NotificationStatus.SENT) {
+                    log.info("Notification already SENT, not marking as FAILED - LogId: {}", notificationLog.getId());
+                    return;
+                }
+
                 freshLog.setStatus(NotificationStatus.FAILED);
                 freshLog.setErrorMessage(error);
                 freshLog.setRetryCount(freshLog.getRetryCount() + 1);

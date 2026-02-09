@@ -29,6 +29,10 @@ public class EmailConfig {
     private String smtpPassword;
     
     private Boolean useSSL = false;
-    
+
     private Boolean useTLS = true;
+
+    // Custom HTML body - if provided, this replaces the default email template entirely
+    // Allows full HTML design like any email builder
+    private String htmlBody;
 }

@@ -38,4 +38,8 @@ public class NotificationMessage implements Serializable {
     private String emailSmtpPassword;
     private Boolean emailUseSSL;
     private Boolean emailUseTLS;
+
+    // Custom template bodies - when provided, replaces default templates entirely
+    private String emailHtmlBody;
+    private String telegramHtmlBody;
 }
