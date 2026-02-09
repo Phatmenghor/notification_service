@@ -5,9 +5,9 @@ spring:
     active: dev
 
   datasource:
-    url: jdbc:postgresql://165.22.247.142:5432/notification_service
-    username: postgres
-    password: Hour1819
+    url: jdbc:postgresql://174.138.17.214:5432/notiication_service
+    username: kithya
+    password: DE6Y6S30XO3KPTH
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
