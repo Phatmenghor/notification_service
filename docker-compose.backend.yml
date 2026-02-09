@@ -1,0 +1,20 @@
+services:
+  backend:
+    container_name: notification_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6060:8080"
+    restart: always
+    depends_on:
+      - kafka
+      - zookeeper
+    networks:
+      - notification-network
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+
+networks:
+  notification-network:
+    external: true

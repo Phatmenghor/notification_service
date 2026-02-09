@@ -4,14 +4,12 @@ spring:
   profiles:
     active: dev
 
+  # Database configuration (can be overridden by environment variables)
   datasource:
-    url: jdbc:postgresql://174.138.17.214:5432/notiication_service
+    url: jdbc:postgresql://174.138.17.214:5432/notification_service
     username: kithya
     password: DE6Y6S30XO3KPTH
     driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
 
   jpa:
     hibernate:
@@ -20,11 +18,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
 
-  # Kafka Configuration
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
     consumer:
       group-id: notification-gateway-group
       auto-offset-reset: earliest
@@ -40,7 +37,12 @@ jwt:
   secret: da2bd42bef8f9f957d647ed13571dadd5b59c7055fb723eacdb05154878da17d77d3180385fc232cab38bded0fc7dbda0d439cc275e91164ade266d64d50633bc7
   expiration: 99999999999999999
 
-# Notification Gateway Configuration
+app:
+  init:
+    create-admin: true
+    admin-email: phatmenghor19@gmail.com
+    admin-password: 88889999
+
 notification:
   gateway:
     enabled: true
@@ -56,14 +58,6 @@ notification:
   email:
     timeout: 10000
 
-app:
-  name: "Notification Gateway Service"
-  version: "1.0.0"
-  init:
-    create-admin: true
-    admin-email: "phatmenghor19@gmail.com"
-    admin-password: "88889999"
-
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -74,3 +68,14 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.emenu: INFO
+    org.springframework.web: INFO
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
+    org.hibernate.orm.jdbc.bind: OFF

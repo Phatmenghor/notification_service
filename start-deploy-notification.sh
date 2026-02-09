@@ -1,22 +1,24 @@
 #!/bin/bash
 set -e
 
-BACKEND_COMPOSE=docker-compose.build.yml
 KAFKA_COMPOSE=docker-compose.yml
 
 echo "🚀 Starting Kafka stack..."
-docker compose -f $KAFKA_COMPOSE up -d
+docker compose -f $KAFKA_COMPOSE up -d zookeeper kafka kafka-ui
 
 echo "⏳ Waiting for Kafka to be ready..."
-sleep 10
+sleep 15
 
-echo "🛑 Stopping old backend..."
-docker compose -f $BACKEND_COMPOSE down || true
+echo "🛑 Stopping backend if running..."
+docker compose -f $KAFKA_COMPOSE down backend || true
 
 echo "🔨 Building backend..."
-docker compose -f $BACKEND_COMPOSE build backend
+docker compose -f $KAFKA_COMPOSE build backend
 
 echo "▶️ Starting backend..."
-docker compose -f $BACKEND_COMPOSE up -d backend
+docker compose -f $KAFKA_COMPOSE up -d backend
 
-echo "✅ Backend is running on port 6060"
+echo "✅ Backend running at http://localhost:6060"
+echo "✅ Kafka UI running at http://localhost:8090"
+echo ""
+echo "📋 Check backend logs with: docker logs -f notification_service"
