@@ -1,17 +1,23 @@
 package com.emenu.features.notification.controller;
 
+import com.emenu.enums.notification.NotificationChannel;
 import com.emenu.features.notification.dto.request.SystemSendNotificationRequest;
 import com.emenu.features.notification.dto.request.UpdateSystemSettingsRequest;
 import com.emenu.features.notification.dto.response.SystemSendNotificationResponse;
 import com.emenu.features.notification.dto.response.SystemSettingsResponse;
 import com.emenu.features.notification.service.SystemNotificationService;
 import com.emenu.shared.dto.ApiResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/v1/public/system-notifications")
@@ -20,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 public class SystemNotificationController {
 
     private final SystemNotificationService systemNotificationService;
+    private final ObjectMapper objectMapper;
 
     // ========== ADMIN ENDPOINTS (Configure Settings) ==========
 
@@ -54,5 +61,39 @@ public class SystemNotificationController {
             systemNotificationService.sendSystemNotification(apiKey, request);
         
         return ResponseEntity.ok(ApiResponse.success("System notification sent", response));
+    }
+
+    @PostMapping(value = "/send-with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<SystemSendNotificationResponse>> sendSystemNotificationWithFile(
+            @RequestHeader("X-API-Key") String apiKey,
+            @RequestPart("request") String requestJson,
+            @RequestPart(value = "file", required = false) MultipartFile htmlFile) {
+
+        try {
+            log.info("System notification with file request - API Key: {}...",
+                     apiKey.substring(0, Math.min(8, apiKey.length())));
+
+            SystemSendNotificationRequest request = objectMapper.readValue(requestJson, SystemSendNotificationRequest.class);
+
+            // Read HTML file content and set it to the appropriate field
+            if (htmlFile != null && !htmlFile.isEmpty()) {
+                String htmlContent = new String(htmlFile.getBytes(), StandardCharsets.UTF_8);
+
+                if (request.getChannel() == NotificationChannel.EMAIL) {
+                    request.setEmailHtmlBody(htmlContent);
+                } else if (request.getChannel() == NotificationChannel.TELEGRAM) {
+                    request.setTelegramHtmlBody(htmlContent);
+                }
+            }
+
+            SystemSendNotificationResponse response =
+                systemNotificationService.sendSystemNotification(apiKey, request);
+
+            return ResponseEntity.ok(ApiResponse.success("System notification sent", response));
+
+        } catch (Exception e) {
+            log.error("Error processing system notification with file: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed to process request: " + e.getMessage()));
+        }
     }
 }
