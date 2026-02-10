@@ -41,8 +41,8 @@ public class NotificationController {
     @PostMapping(value = "/send-with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<SendNotificationResponse>> sendNotificationWithFile(
             @RequestHeader("X-API-Key") String apiKey,
-            @RequestPart("request") String requestJson,
-            @RequestPart(value = "file", required = false) MultipartFile htmlFile) {
+            @RequestParam("request") String requestJson,
+            @RequestParam(value = "file", required = false) MultipartFile htmlFile) {
 
         try {
             log.info("Notification with file request received - API Key: {}...", apiKey.substring(0, 8));

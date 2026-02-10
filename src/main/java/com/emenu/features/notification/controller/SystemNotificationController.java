@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,21 +28,22 @@ public class SystemNotificationController {
     private final SystemNotificationService systemNotificationService;
     private final ObjectMapper objectMapper;
 
-    // ========== ADMIN ENDPOINTS (Configure Settings) ==========
+    // ========== SETTINGS ENDPOINTS (API Key Authenticated) ==========
 
     @GetMapping("/settings")
-    @PreAuthorize("hasRole('PLATFORM_OWNER') or hasRole('PLATFORM_ADMIN')")
-    public ResponseEntity<ApiResponse<SystemSettingsResponse>> getSystemSettings() {
-        SystemSettingsResponse response = systemNotificationService.getSystemSettings();
+    public ResponseEntity<ApiResponse<SystemSettingsResponse>> getSystemSettings(
+            @RequestHeader("X-API-Key") String apiKey) {
+        SystemSettingsResponse response = systemNotificationService.getSystemSettings(apiKey);
         return ResponseEntity.ok(ApiResponse.success("System settings retrieved", response));
     }
 
     @PutMapping("/settings")
-    @PreAuthorize("hasRole('PLATFORM_OWNER') or hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<ApiResponse<SystemSettingsResponse>> updateSystemSettings(
+            @RequestHeader("X-API-Key") String apiKey,
             @Valid @RequestBody UpdateSystemSettingsRequest request) {
-        log.info("Updating system notification settings");
-        SystemSettingsResponse response = systemNotificationService.updateSystemSettings(request);
+        log.info("Updating system notification settings - API Key: {}...",
+                 apiKey.substring(0, Math.min(8, apiKey.length())));
+        SystemSettingsResponse response = systemNotificationService.updateSystemSettings(apiKey, request);
         return ResponseEntity.ok(ApiResponse.success("System settings updated", response));
     }
 
@@ -66,8 +67,8 @@ public class SystemNotificationController {
     @PostMapping(value = "/send-with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<SystemSendNotificationResponse>> sendSystemNotificationWithFile(
             @RequestHeader("X-API-Key") String apiKey,
-            @RequestPart("request") String requestJson,
-            @RequestPart(value = "file", required = false) MultipartFile htmlFile) {
+            @RequestParam("request") String requestJson,
+            @RequestParam(value = "file", required = false) MultipartFile htmlFile) {
 
         try {
             log.info("System notification with file request - API Key: {}...",

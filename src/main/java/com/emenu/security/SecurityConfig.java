@@ -49,8 +49,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/public/notifications/**").permitAll()
 
-                        .requestMatchers("/api/v1/public/system-notifications/send").permitAll()
-                        .requestMatchers("/api/v1/public/system-notifications/settings").hasAnyRole("PLATFORM_OWNER", "PLATFORM_ADMIN")
+                        .requestMatchers("/api/v1/public/system-notifications/**").permitAll()
 
                         .requestMatchers("/api/v1/users/admin-token").permitAll()
                         .requestMatchers("/api/v1/users/api-key").permitAll()

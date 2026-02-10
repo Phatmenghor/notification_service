@@ -200,15 +200,23 @@ public class TelegramNotificationConsumer {
 
     private String formatTelegramMessage(NotificationMessage message) {
         StringBuilder formatted = new StringBuilder();
-        formatted.append("<b>🔔 ").append(message.getType()).append("</b>\n\n");
-        
-        if (message.getSubject() != null) {
+
+        if (message.getType() != null) {
+            formatted.append("<b>🔔 ").append(message.getType()).append("</b>\n\n");
+        }
+
+        if (message.getSubject() != null && !message.getSubject().isBlank()) {
             formatted.append("<b>").append(message.getSubject()).append("</b>\n\n");
         }
-        
-        formatted.append(message.getMessage());
-        formatted.append("\n\n<i>From: ").append(message.getSystemName()).append("</i>");
-        
+
+        if (message.getMessage() != null && !message.getMessage().isBlank()) {
+            formatted.append(message.getMessage());
+        }
+
+        if (message.getSystemName() != null && !message.getSystemName().isBlank()) {
+            formatted.append("\n\n<i>From: ").append(message.getSystemName()).append("</i>");
+        }
+
         return formatted.toString();
     }
 

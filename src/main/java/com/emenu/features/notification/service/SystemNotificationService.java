@@ -6,10 +6,10 @@ import com.emenu.features.notification.dto.response.SystemSendNotificationRespon
 import com.emenu.features.notification.dto.response.SystemSettingsResponse;
 
 public interface SystemNotificationService {
-    
-    SystemSettingsResponse getSystemSettings();
-    
-    SystemSettingsResponse updateSystemSettings(UpdateSystemSettingsRequest request);
-    
+
+    SystemSettingsResponse getSystemSettings(String apiKey);
+
+    SystemSettingsResponse updateSystemSettings(String apiKey, UpdateSystemSettingsRequest request);
+
     SystemSendNotificationResponse sendSystemNotification(String apiKey, SystemSendNotificationRequest request);
 }

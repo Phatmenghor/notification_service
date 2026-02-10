@@ -43,14 +43,16 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
 
     @Override
     @Transactional(readOnly = true)
-    public SystemSettingsResponse getSystemSettings() {
+    public SystemSettingsResponse getSystemSettings(String apiKeyValue) {
+        apiKeyService.validateApiKey(apiKeyValue);
         SystemNotificationSettings settings = getOrCreateSettings();
         return settingsMapper.toResponse(settings);
     }
 
     @Override
     @Transactional
-    public SystemSettingsResponse updateSystemSettings(UpdateSystemSettingsRequest request) {
+    public SystemSettingsResponse updateSystemSettings(String apiKeyValue, UpdateSystemSettingsRequest request) {
+        apiKeyService.validateApiKey(apiKeyValue);
         log.info("Updating system notification settings");
 
         SystemNotificationSettings settings = getOrCreateSettings();

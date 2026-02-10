@@ -196,6 +196,11 @@ public class EmailNotificationConsumer {
     }
 
     private String formatEmailMessage(NotificationMessage message) {
+        String typeStr = message.getType() != null ? message.getType().toString() : "Notification";
+        String subjectStr = message.getSubject() != null ? message.getSubject() : "Notification";
+        String messageStr = message.getMessage() != null ? message.getMessage().replace("\n", "<br/>") : "";
+        String systemName = message.getSystemName() != null ? message.getSystemName() : "";
+
         return String.format("""
             <html>
             <body style="font-family: Arial, sans-serif;">
@@ -215,10 +220,7 @@ public class EmailNotificationConsumer {
             </body>
             </html>
             """,
-            message.getType(),
-            message.getSubject() != null ? message.getSubject() : "Notification",
-            message.getMessage().replace("\n", "<br/>"),
-            message.getSystemName()
+            typeStr, subjectStr, messageStr, systemName
         );
     }
 
